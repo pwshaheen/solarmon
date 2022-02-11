@@ -130,7 +130,8 @@ class Growatt:
             gridstatus = "Off Grid" 
             
         powerConsumption = read_single(row,10)                               
-        info = {                                    
+        info = {
+            #General Data Points                                    
             'StatusCode': row.registers[0],         
             'Status': StateCodes[row.registers[0]],
             'Ppv': read_double(row, 3),            
@@ -140,6 +141,7 @@ class Growatt:
             'BatteryPercentRemaining': boc,      
             'GridInput_Volts': read_single(row,20),
             'GridUsed_Volts': read_single(row,39),
+            'GridUsed_Watts': read_single(row,37),
             'GridStatus': gridstatus,
             'PowerOutput_Volts': read_single(row,22),
             'PowerOutput_Amps': read_single(row,34),
@@ -150,6 +152,9 @@ class Growatt:
             'BatteryDischarge_Watts': read_single(row,74),
             'BatteryDischarge_Amps': read_single(row,76),
             'BatteryChargingCurrent': read_single(row,68),
+            #Solar Data Points
+            'SolarPanel_Volts': read_single(row,1),
+            'SolarPanel_Watts': read_single(row,4),
             #green calcs
             'CO2_MilesSaved': powerConsumption*miles,
             'CO2_CoalAvoided_lbs': powerConsumption*coal,
@@ -163,7 +168,10 @@ class Growatt:
             'BatteryEnergyUsed_kwToday': read_single(row,61),
             'BatteryEnergyUsed_kwTotal': read_single(row,63),
             'GridEnergyUsedDirectly_kwToday': read_single(row,65),
-            'GridEnergyUsedDirectly_kwTotal': read_single(row,67)
+            'GridEnergyUsedDirectly_kwTotal': read_single(row,67),
+            'SolarGenerated_kwToday': read_single(row,49),
+            'SolarGenerated_kwTototal': read_single(row,51)
+            
 
 
             #'Vpv1': read_single(row, 1),            # 0.1V,     Vpv1,               PV1 voltage

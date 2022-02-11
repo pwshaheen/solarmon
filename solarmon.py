@@ -13,7 +13,7 @@ from influxdb import InfluxDBClient
 from pymodbus.client.sync import ModbusSerialClient as ModbusClient
 from growatt import Growatt
 
-setupSleep = 5
+setupSleep = 120
 
 logging.basicConfig(filename='log.log', encoding='utf-8', level=logging.INFO,format='%(asctime)s %(levelname)-8s %(message)s',datefmt='%Y-%m-%d %H:%M:%S')
 logging.info('Waiting 60 seconds for internet connection and influxDB to establish')
@@ -25,6 +25,8 @@ settings.read(os.path.dirname(os.path.realpath(__file__)) + '/solarmon.cfg')
 interval = settings.getint('query', 'interval', fallback=1)
 offline_interval = settings.getint('query', 'offline_interval', fallback=60)
 error_interval = settings.getint('query', 'error_interval', fallback=60)
+rebootEnabled = settings.getint('query', 'rebootEnabled', fallback=0)
+rebootCount = settings.getint('query', 'rebootErrorCount', fallback=30)
 
 localEnabled = settings.get('influx', 'enabled')
 db_name = settings.get('influx', 'db_name', fallback='inverter')
@@ -71,77 +73,97 @@ except:
 
 while setupError > 0:
     try:
-        client = ModbusClient(method='rtu', port=port, baudrate=9600, stopbits=1, parity='N', bytesize=8, timeout=1)
+        client = ModbusClient(method='rtu', port=port, baudrate=9600, stopbits=1, parity='N', bytesize=8, timeout=5, strict=False)
         client.connect()
         logging.info('Loading inverters... ')
         inverters = []
         for section in settings.sections():
-            name = section[10:]
-            unit = int(settings.get(section, 'unit'))
-            measurement = settings.get(section, 'measurement')
-            growatt = Growatt(client, name, unit)
-            #growatt.print_info()
-            inverters.append({
-                'error_sleep': 0,
-                'growatt': growatt,
-                'measurement': measurement
-            })
+            if "inverters" in section:
+                name = section[10:]
+                unit = int(settings.get(section, 'unit'))
+                measurement = settings.get(section, 'measurement')
+                growatt = Growatt(client, name, unit)
+                #growatt.print_info()
+                inverters.append({
+                    'error_sleep': 0,
+                    'growatt': growatt,
+                    'measurement': measurement
+                })
         setupError = 0    
-    except:
+    except Exception as err:
+        logging.error(err)
         logging.error('Error Loading Inverter Info.  Error Count ' + str(setupError))
         setupError = setupError + 1
         time.sleep(offline_interval)
-        if setupError > 10:
+        if setupError > rebootCount:
             logging.info('reached max error tolerance.  Rebooting Pi.')
-            #os.system('sudo reboot')
+            if rebootEnabled == 1:
+                os.system('sudo reboot')
+            else: 
+                logging.info('reboot has been disabled.  Only resetting error counter.')
+                setupError = 1
+
         continue
 logging.info('Starting Monitoring Loop')
 while True:
-    online = False
-    for inverter in inverters:
+    try:
+
+        online = False
+        for inverter in inverters:
         # If this inverter errored then we wait a bit before trying again
-        if inverter['error_sleep'] > 0:
-            inverter['error_sleep'] -= interval
-            continue
-
-        growatt = inverter['growatt']
-
-        try:
-            now = datetime.utcnow()
-            info = growatt.read()
-            #print(info)
-
-            if info is None:
+            if inverter['error_sleep'] > 0:
+                inverter['error_sleep'] -= interval
                 continue
 
-            # Mark that at least one inverter is online so we should continue collecting data
-            online = True
+            growatt = inverter['growatt']
+    except Exception as err:
+        logging.error('Error loading Inverters ' + err)
+    try:
+        #logging.info('read')
+        now = datetime.utcnow()
+        info = growatt.read()
+            #print(info)
 
-            points = [{
-                'time': now,
-                'tag': inverter['measurement'],
-                'measurement':'Growatt_Inverter',
-                "fields": info
-            }]
+        if info is None:
+            continue
+
+            # Mark that at least one inverter is online so we should continue collecting data
+        online = True
+
+        points = [{
+            'time': now,
+            'tag': inverter['measurement'],
+            'measurement':'Growatt_Inverter',
+            "fields": info
+         }]
            
 
-            if cloudEnabled == "1" and cloudError == 0:
-                try:
-                    write_api.write(bucket, org, points)
-                except:
-                    cloudError=1
+        if cloudEnabled == "1" and cloudError == 0:
+            try:
+                write_api.write(bucket, org, points)
+            except Exception as err:
+                cloudError=1
+                logging.error('error writing to cloud ' + err)
                 #print('writing to cloud')
             if localEnabled == "1":
-                influx.write_points(points, time_precision='s')
-                #print('writing local')
-
-
-        except Exception as err:
-            logging.error(growatt.name)
-            logging.error(err)
-            logging.error('there was an exception')
-            inverter['error_sleep'] = error_interval
-            pass
+                try:
+                    influx.write_points(points, time_precision='s')
+                except Exception as err:
+                    logging.error('error writing to local card ' + err)
+                
+    except Exception as err:
+        logging.error(growatt.name)
+        logging.error(str(err))
+        logging.error('there was an exception')
+        #inverter['error_sleep'] = error_interval
+        logging.info('Captured Error and increasing error count to ' + str(setupError))
+        if rebootEnabled == 1 and setupError > rebootCount:
+            logging.info('Rebooting')
+            os.system('sudo reboot')
+        else:
+            logging.info('reboot not enabled.  Continuing')
+            online=False    
+        continue
     if online:
         time.sleep(interval)
     else:

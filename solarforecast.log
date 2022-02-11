@@ -1,0 +1,10 @@
+2021-12-25 07:13:26 INFO     {'correlationId': '2e16880b', 'title': 'Service Unavailable', 'type': 'https://api.weather.gov/problems/ServiceUnavailable', 'status': 503, 'detail': 'An upstream data source is temporarily unavailable. Please try again later.', 'instance': 'https://api.weather.gov/requests/2e16880b'}
+2021-12-25 07:14:50 INFO     {'correlationId': 'ed48954', 'title': 'Service Unavailable', 'type': 'https://api.weather.gov/problems/ServiceUnavailable', 'status': 503, 'detail': 'An upstream data source is temporarily unavailable. Please try again later.', 'instance': 'https://api.weather.gov/requests/ed48954'}
+2021-12-25 07:14:50 INFO     error with Weather API
+2021-12-25 07:14:50 ERROR    'properties'
+2021-12-26 04:27:43 INFO     error with Weather API
+2021-12-26 04:27:43 ERROR    'properties'
+2022-01-22 20:51:05 INFO     error with Weather API
+2022-01-22 20:51:18 ERROR    HTTPSConnectionPool(host='api.weather.gov', port=443): Max retries exceeded with url: /gridpoints/FFC/48,106/forecast (Caused by SSLError(SSLEOFError(8, 'EOF occurred in violation of protocol (_ssl.c:1123)')))
+2022-01-26 04:54:59 INFO     error with Weather API
+2022-01-26 04:54:59 ERROR    'properties'
